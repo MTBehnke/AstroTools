@@ -16,24 +16,23 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
+
 
 public class MainActivity extends AppCompatActivity {
 
-    //  User Location Variables - initial values
-    //  misc note - in Excel to get Julian date add 2415018.50 to Excel date value
-    public double userLat = 45.2258;
-    public double userLong = -93.28105;
-    //double userElev = 274;      // meters
-    public Double lstOffset;
     TextView sunOnDateTVO;
     TextView sunRATVO;
     TextView sunDecTVO;
     TextView sunVarTVO;
-    double theSunRA;                // Right Ascension
-    double theSunDec;               // Declination
-    double theSunVar;               // Temp variable for debugging
-    String theSunDecDMS;
-    String theSunRAHMS;
+    TextView sunVarTVO2;
+    TextView sunVarTVO3;
+
+
 
 
     @Override
@@ -43,59 +42,75 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        //Create sunOnDate calendar objects and set dates to desired time
-        Calendar sunOnDateCal = new GregorianCalendar();
-        sunOnDateCal.setTimeZone((TimeZone.getTimeZone("GMT")));
-        sunOnDateCal.set(2003,6,27,0,0,0);
-        lstOffset =  userLong / 15.0;
+        // Create Joda DateTime instance and set date to desired time
+        DateTime dateCal = new DateTime(2017,2,16,3,47,39,0, DateTimeZone.UTC);
 
+        // set user location
+        double userLat = 45 + (13 + 59.88/60)/60;
+        double userLong = -93 + (17 + 28.84/60)/60;
+
+        // set DSO Right Ascension (set to Betelguese)
+        double dsoRA = (5 + (56 + 6.42/60)/60) * (360/24);
+        double dsoDec = 7 + (24 + 24.2/60)/60;
+
+        // Get days since J2000
+        double daysSinceJ2000 = AstroCalc.daysSinceJ2000((dateCal.getMillis()));
+        double greenwichST = AstroCalc.greenwichST(daysSinceJ2000);
+        double localST = AstroCalc.localST(greenwichST, userLong);
+        double hourAngle = AstroCalc.hourAngle(localST, dsoRA);
+        double dsoAlt = AstroCalc.dsoAlt(dsoDec, userLat, hourAngle);
+        double dsoAz = AstroCalc.dsoAz(dsoDec, userLat, hourAngle, dsoAlt);
+
+        //lstOffset =  userLong / 15.0;
+
+        /*
         // create Sun object and determine location
         Sun theSun = new Sun();
         theSun.updateSunLoc (sunOnDateCal);
         theSunRA = theSun.getSunRA();
-        theSunRAHMS = convertDDToHMS(theSunRA);
+        theSunRAHMS = AstroCalc.convertDDToHMS(theSunRA);
         theSunDec = theSun.getSunDec();
-        theSunDecDMS = convertDDToDMS(theSunDec);
+        theSunDecDMS = AstroCalc.convertDDToDMS(theSunDec);
         theSunVar = theSun.getSunVar();
+        */
 
         // Display result
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+        //SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+        DateTimeFormatter fmt = DateTimeFormat.longDateTime().withZoneUTC();
+
         sunOnDateTVO = (TextView)findViewById(R.id.sunOnDateTVId);
-        String sunOnDateString = sdf.format(sunOnDateCal.getTime());
+        String sunOnDateString = Double.toString(daysSinceJ2000);
         sunOnDateTVO.setText(sunOnDateString);
 
         sunRATVO = (TextView)findViewById(R.id.sunRATVId);
-        //String sunRAString = Double.toString(theSunRA);
-        String sunRAString = theSunRAHMS;
+        String sunRAString = Double.toString(greenwichST);
+        //String sunRAString = theSunRAHMS;
         sunRATVO.setText(sunRAString);
 
         sunDecTVO = (TextView)findViewById(R.id.sunDecTVId);
-        //String sunDecString = Double.toString(theSunDec);
-        String sunDecString = theSunDecDMS;
+        String sunDecString = Double.toString(localST);
+        //String sunDecString = theSunDecDMS;
         sunDecTVO.setText(sunDecString);
 
         sunVarTVO = (TextView)findViewById(R.id.sunVarTVId);
-        //String sunVarString = sdf.format(lstOnDateCal.getTime());
-        String sunVarString = Double.toString(lstOffset);
+        //String sunVarString = dateCal.toString(fmt);
+        String sunVarString = Double.toString(hourAngle);
         sunVarTVO.setText(sunVarString);
+
+        sunVarTVO2 = (TextView)findViewById(R.id.sunVarTVId2);
+        //String sunVarString = dateCal.toString(fmt);
+        String sunVarString2 = Double.toString(dsoAlt);
+        sunVarTVO2.setText(sunVarString2);
+
+        sunVarTVO3 = (TextView)findViewById(R.id.sunVarTVId3);
+        //String sunVarString = dateCal.toString(fmt);
+        String sunVarString3 = Double.toString(dsoAz);
+        sunVarTVO3.setText(sunVarString3);
+
+
     }
 
-    public String convertDDToDMS(double dd) {
-        int deg = (int) dd;
-        int min = (int) ((dd-deg)*60.0);
-        long sec =  Math.round ((dd-deg-(min/60.0))*3600);
-        String dms = deg + "° " + min + "' " + sec + "\"";
-        return dms;
-    }
 
-    public String convertDDToHMS (double dd) {
-        dd = 24.0 * dd / 360.0;
-        int hour = (int) dd;
-        int min = (int) ((dd-hour)*60.0);
-        long sec =  Math.round ((dd-hour-(min/60.0))*3600);
-        String hms = hour + "h " + min + "m " + sec + "s";
-        return hms;
-    }
 
 
     @Override
@@ -119,6 +134,9 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
+
+
+
 
 
         /*  Temp disable action button
